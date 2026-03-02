@@ -39,21 +39,22 @@
 
 // Reading the contents of the LIN Descriptor File is too much for this project
 static uint8_t g_current_val = 0;
+static uint8_t g_average_val = 0;
 
 void lin_rx_isr(uint8_t id) {
 
     // If the LIN master is looking for node temp id, send the avg temp over LIN
     if(id == LIN_AVG_TEMP_SENSOR_ID) {
         // calculate the avg;
-
+        lin_write_response_data(LIN_AVG_TEMP_SENSOR_ID,(uint8_t *)&g_average_val, sizeof(g_average_val));
 
     } else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
         // If the LIN master is looking for node temp id, send the last sample over LIN
-
+        lin_write_response_data(LIN_CURRENT_TEMP_SENSOR_ID,(uint8_t *)&g_current_val, sizeof(g_current_val));
     }
 
     // Clear the lin interrupt before exit isr:
-
+    lin_clear_rx_frame_interrupt();
 }
 
 int main(int argc, char **argv) {

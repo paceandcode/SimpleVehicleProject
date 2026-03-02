@@ -34,6 +34,8 @@
 #define ADC_REG  0x00
 #define SLEEP_DURATION_MS 1000
 
+#define I2C_CONTROL_REGISTER 0xFF000030
+
 // Reading the contents of the LIN Descriptor File is too much for this project
 static uint8_t g_current_val = 0;
 
@@ -55,7 +57,7 @@ void lin_rx_isr(uint8_t id) {
 
 int main(int argc, char **argv) {
     // Configure the I2C controller and LIN controller here:
-
+    i2c_write_config(I2C_CONTROL_REGISTER, I2C_CLK_100KHZ | I2C_HOST | I2C_IDLE_LOW | I2C_CLK_RISING_EDGE);
 
     // Add the LIN RX ISR
     lin_add_rx_frame_header_interrupt(lin_rx_isr);

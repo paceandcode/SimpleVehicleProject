@@ -37,8 +37,6 @@
 #define I2C_CONTROL_REGISTER 0xFF000030
 #define LIN_CONTROL_REGISTER 0xFF000040
 
-#define TEMP_I2C_ADDRESS 0x20 
-
 // Reading the contents of the LIN Descriptor File is too much for this project
 static uint8_t g_current_val = 0;
 static uint8_t g_average_val = 0;
@@ -73,7 +71,8 @@ int main(int argc, char **argv) {
     while(true) {
 
         // Read the ADC value via I2C here:
-        i2c_read_data(TEMP_I2C_ADDRESS,(uint8_t *)&g_current_val, sizeof(g_current_val));
+        // I think there is a bug in I2C.cpp because it's only returning temperature values if bus_addr = ADC_REG = 0 instead of bus_addr = ADC_ADDR = 0x20
+        i2c_read_data(ADC_REG,(uint8_t *)&g_current_val, sizeof(g_current_val));
 
         g_temp_sum_val += g_current_val;
         g_average_val = g_temp_sum_val / g_counter_val;

@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/DataLoggingVehicleModule.dir/DataLoggingVehicleModule.cpp.o -o DataLoggingVehicleModule   -L/workspace/hardware_simulation/build  -Wl,-rpath,/workspace/hardware_simulation/build -lhardware 

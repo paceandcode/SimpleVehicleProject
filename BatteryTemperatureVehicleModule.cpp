@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <chrono>
 #include <thread>
+#include <cstring>
 
 // 1. Configure the LIN controller with Baud 9600, 1 Start bit, 1 Stop bit, 8 Data bits, No flow control, Master mode
 // 2. Configure the CAN controller with Baud 100K, 11 bit format
@@ -21,7 +22,9 @@
 
 static uint8_t g_current_val = 0;
 static uint8_t g_average_val = 0;
-static uint8_t g_timestamp_val = 0;
+static uint64_t g_timestamp_current_val = 0;
+static uint64_t g_timestamp_average_val = 0;
+static uint8_t g_payload[8];
 
 // REMEMBER:
 // 1. CAN RTR frames are request for data from another CAN device
@@ -34,21 +37,27 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
     if(id == CAN_AVG_TEMPERATURE_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
-        printf("Average temperature data: %d\n", data[0]);
+        printf("Average temperature data: %d\n", g_average_val);
         // Setup CAN DATA frame to send the avg temperature data
-        can_send_new_packet(id, type, (uint8_t *)&data, len);
+        uint8_t payload[1];
+        payload[0] = g_average_val;
+        can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_DATA_FRAME, payload, sizeof(payload));
 
     } else if(id == CAN_CURRENT_TEMP_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
-        printf("Current temperature data: %d\n", data[0]);
+        printf("Current temperature data: %d\n", g_current_val);
         // Setup CAN DATA frame to send the current temperature data
-        can_send_new_packet(id, type, (uint8_t *)&data, len);
+        uint8_t payload[1];
+        payload[0] = g_current_val;
+        can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_DATA_FRAME, payload, sizeof(payload));
 
     } else if(id == CAN_TIME_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
         printf("Current time: %d\n", data[0]);
         // Setup CAN DATA frame to send the time
-        can_send_new_packet(id, type, (uint8_t *)&data, len);
+        uint64_t t_now = TIME_NOW_S();
+        std::memcpy(g_payload, &t_now, sizeof(t_now));
+        can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_DATA_FRAME, g_payload, sizeof(g_payload));
     }
 
     // Clear the can interrupt before exit isr:
@@ -57,11 +66,11 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
 void lin_rx_isr(uint8_t id, uint8_t *data, uint8_t len) {
     if(id == LIN_AVG_TEMP_SENSOR_ID) {
-        g_timestamp_val = TIME_NOW_S();
+        
         g_average_val = data[0];
         printf("Average Temperature data: %d\n", data[0]);
     } else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
-        g_timestamp_val = TIME_NOW_S();
+        
         g_current_val = data[0];
         printf("Current Temperature data: %d\n", data[0]);
     }
@@ -73,7 +82,7 @@ void lin_rx_isr(uint8_t id, uint8_t *data, uint8_t len) {
 
 int main(int argc, char **argv) {
     // Configure the LIN controller and CAN controller here:
-    lin_write_config(LIN_CONTROL_REGISTER, LIN_BAUD_RATE_9600 | LIN_START_BITS_1 | LIN_STOP_BITS_1 | LIN_DATA_BITS_8 | LIN_NO_FLOW_CONTROL | LIN_MODE_LEADER);
+    lin_write_config(LIN_CONTROL_REGISTER, LIN_BAUD_RATE_9600 | LIN_START_BITS_1 | LIN_STOP_BITS_1 | LIN_DATA_BITS_8 | LIN_NO_FLOW_CONTROL | LIN_MODE_LEADER | LIN_PARITY_NONE);
     can_write_config(CAN_HARDWARE_REGISTER, CAN_BAUD_RATE_100K | CAN_FORMAT_11BIT);
 
     //Add the LIN frame response ISR
@@ -86,9 +95,12 @@ int main(int argc, char **argv) {
     while(true) {
         // Every 500 ms get the avg temperature from the temperature module
         // Every 500 ms get the current temperature the temperature module
+        g_timestamp_average_val = TIME_NOW_S();
         lin_write_frame_header(LIN_AVG_TEMP_SENSOR_ID);
+        SLEEP_MS(20);
+        g_timestamp_current_val = TIME_NOW_S();
         lin_write_frame_header(LIN_CURRENT_TEMP_SENSOR_ID);
-        SLEEP_MS(500);
+        SLEEP_MS(480);
     }
     return 0;
 }

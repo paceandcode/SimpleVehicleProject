@@ -49,6 +49,7 @@ void lin_rx_isr(uint8_t id) {
     // If the LIN master is looking for node temp id, send the avg temp over LIN
     if(id == LIN_AVG_TEMP_SENSOR_ID) {
         // calculate the avg;
+        g_average_val = g_temp_sum_val / g_counter_val;
         lin_write_response_data(LIN_AVG_TEMP_SENSOR_ID,(uint8_t *)&g_average_val, sizeof(g_average_val));
 
     } else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
@@ -75,7 +76,6 @@ int main(int argc, char **argv) {
         i2c_read_data(ADC_REG,(uint8_t *)&g_current_val, sizeof(g_current_val));
 
         g_temp_sum_val += g_current_val;
-        g_average_val = g_temp_sum_val / g_counter_val;
         g_counter_val += 1;
 
         printf("ADC Value: %d\n", g_current_val);

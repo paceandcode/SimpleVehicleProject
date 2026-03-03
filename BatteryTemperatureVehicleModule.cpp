@@ -17,6 +17,12 @@
 #define SLEEP_MS(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 #define TIME_NOW_S() std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count()
 
+#define LIN_CONTROL_REGISTER 0xFF000040
+
+static uint8_t g_current_val = 0;
+static uint8_t g_average_val = 0;
+static uint8_t g_timestamp_val = 0;
+
 // REMEMBER:
 // 1. CAN RTR frames are request for data from another CAN device
 // 2. CAN DATA frames are responses to a CAN RTR frames
@@ -30,32 +36,45 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
         printf("Average temperature data: %d\n", data[0]);
         // Setup CAN DATA frame to send the avg temperature data
+        can_send_new_packet(id, type, (uint8_t *)&data, len);
 
-    } // else if() ...
+    } else if(id == CAN_CURRENT_TEMP_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
+        printf("Current temperature data: %d\n", data[0]);
+        // Setup CAN DATA frame to send the current temperature data
+        can_send_new_packet(id, type, (uint8_t *)&data, len);
+
+    } else if(id == CAN_TIME_11_SENSOR_ID && type == CAN_RTR_FRAME) {
+
+        printf("Current time: %d\n", data[0]);
+        // Setup CAN DATA frame to send the time
+        can_send_new_packet(id, type, (uint8_t *)&data, len);
+    }
 
     // Clear the can interrupt before exit isr:
-
+    can_clear_rx_packet_interrupt();
 }
 
 void lin_rx_isr(uint8_t id, uint8_t *data, uint8_t len) {
     if(id == LIN_AVG_TEMP_SENSOR_ID) {
-
-
+        g_timestamp_val = TIME_NOW_S();
+        g_average_val = data[0];
         printf("Average Temperature data: %d\n", data[0]);
     } else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
-
-
+        g_timestamp_val = TIME_NOW_S();
+        g_current_val = data[0];
         printf("Current Temperature data: %d\n", data[0]);
     }
 
     // Clear the lin interrupt before exit isr:
+    lin_clear_frame_resp_interrupt();
 }
 
 
 int main(int argc, char **argv) {
     // Configure the LIN controller and CAN controller here:
-
+    lin_write_config(LIN_CONTROL_REGISTER, LIN_BAUD_RATE_9600 | LIN_START_BITS_1 | LIN_STOP_BITS_1 | LIN_DATA_BITS_8 | LIN_NO_FLOW_CONTROL | LIN_MODE_LEADER);
+    can_write_config(CAN_HARDWARE_REGISTER, CAN_BAUD_RATE_100K | CAN_FORMAT_11BIT);
 
     //Add the LIN frame response ISR
     // This ISR fires when a slave node responds to a master node request, In this case the temperature sensor module
@@ -67,7 +86,9 @@ int main(int argc, char **argv) {
     while(true) {
         // Every 500 ms get the avg temperature from the temperature module
         // Every 500 ms get the current temperature the temperature module
-
+        lin_write_frame_header(LIN_AVG_TEMP_SENSOR_ID);
+        lin_write_frame_header(LIN_CURRENT_TEMP_SENSOR_ID);
+        SLEEP_MS(500);
     }
     return 0;
 }

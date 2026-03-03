@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/SimpleSensorMonitor.dir/SimpleSensorMonitor.cpp.o -o SimpleSensorMonitor   -L/workspace/hardware_simulation/build  -Wl,-rpath,/workspace/hardware_simulation/build -lhardware 

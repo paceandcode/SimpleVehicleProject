@@ -60,6 +60,7 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
         can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_DATA_FRAME, g_payload, sizeof(g_payload));
     }
 
+    printf("Unknown CAN packet received\n");
     // Clear the can interrupt before exit isr:
     can_clear_rx_packet_interrupt();
 }

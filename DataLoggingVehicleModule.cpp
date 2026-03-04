@@ -66,7 +66,7 @@ void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t le
         printf("Unknown CAN packet received\n");
     }
 
-
+    printf("CAN packet received\n");
     // Clear the can interrupt before exit isr:
     can_clear_rx_packet_interrupt();
 }
@@ -78,13 +78,17 @@ int main(int argc, char **argv) {
     // Configure the SPI and CAN controllers;
     can_write_config(CAN_HARDWARE_REGISTER, CAN_BAUD_RATE_100K | CAN_FORMAT_11BIT);
     spi_write_config(SPI_HARDWARE_REGISTER, SPI_CLK_1MHZ | SPI_CS_1);
+    printf("CAN & SPI config set\n");
 
     can_add_filter(0,0x7FF,0x14F);
     can_add_filter(1,0x7FF,0x15F);
     can_add_filter(2,0x7FF,0x18F);
+    printf("CAN filters set\n");
 
     // Add the CAN RX ISR
     can_add_rx_packet_interrupt(can_packet_isr);
+
+    printf("CAN RX interrupt set\n");
 
     while(true) {
         // Send the CAN RTR frames to the BatteryTemperatureVehicleModule every 500ms
@@ -92,6 +96,8 @@ int main(int argc, char **argv) {
         can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_average_val));
         can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_current_val));
         can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_timestamp_current_val));
+
+        printf("CAN RTR frames sent\n");
 
         if (g_buffer_counter_val >= (SPI_FLASH_DATA_PTS_PER_PAGE - 1)) {
             // Flash löschen und schreiben

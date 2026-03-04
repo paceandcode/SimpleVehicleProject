@@ -79,6 +79,10 @@ int main(int argc, char **argv) {
     can_write_config(CAN_HARDWARE_REGISTER, CAN_BAUD_RATE_100K | CAN_FORMAT_11BIT);
     spi_write_config(SPI_HARDWARE_REGISTER, SPI_CLK_1MHZ | SPI_CS_1);
 
+    can_add_filter(0,0x7FF,0x14F);
+    can_add_filter(1,0x7FF,0x15F);
+    can_add_filter(2,0x7FF,0x18F);
+
     // Add the CAN RX ISR
     can_add_rx_packet_interrupt(can_packet_isr);
 

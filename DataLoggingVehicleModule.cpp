@@ -33,7 +33,13 @@
 #define SPI_FLASH_DATA_PTS_PER_PAGE  (SPI_FLASH_PAGE_SIZE / sizeof(SPI_FLASH_data_pt_t))
 #define SPI_FLASH_PAGES_TOTAL        (SPI_FLASH_SZ / SPI_FLASH_PAGE_SIZE)
 
+static uint8_t g_current_val = 0;
+static uint8_t g_average_val = 0;
+static uint64_t g_timestamp_current_val = 0;
 
+SPI_FLASH_data_pt_t g_buffer[SPI_FLASH_DATA_PTS_PER_PAGE];
+static uint8_t g_buffer_counter_val = 0;
+static uint8_t g_page_counter_val = 0;
 
 void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t len) {
     // we can not save the page in the isr, too slow
@@ -43,14 +49,26 @@ void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t le
     if(id == CAN_AVG_TEMPERATURE_11_SENSOR_ID && type == CAN_DATA_FRAME) {
 
         printf("Average temperature data: %d\n", data[0]);
+        g_buffer[g_buffer_counter_val].avg_temp = data[0];
 
-    } //else if() ...
+    } else if(id == CAN_CURRENT_TEMP_11_SENSOR_ID && type == CAN_DATA_FRAME) {
+
+        printf("Current temperature data: %d\n", data[0]);
+        g_buffer[g_buffer_counter_val].current_temp = data[0];
+
+    } else if(id == CAN_TIME_11_SENSOR_ID && type == CAN_DATA_FRAME) {
+
+        printf("Time stamp data: %d\n", data[0]);
+        g_buffer[g_buffer_counter_val].time = (data[0] << 24) | (data[1] << 16) | (data[2] << 8)| (data[3] << 0);
+
+    }
     else {
         printf("Unknown CAN packet received\n");
     }
 
 
     // Clear the can interrupt before exit isr:
+    can_clear_rx_packet_interrupt();
 }
 
 
@@ -67,8 +85,39 @@ int main(int argc, char **argv) {
     while(true) {
         // Send the CAN RTR frames to the BatteryTemperatureVehicleModule every 500ms
         // Once a full SPI Flash page size worth of data is received, save it to the SPI Flash
+        can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_average_val));
+        can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_current_val));
+        can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_timestamp_current_val));
 
+        if (g_buffer_counter_val >= (SPI_FLASH_DATA_PTS_PER_PAGE - 1)) {
+            // Flash löschen und schreiben
+            uint8_t buffer[1];
+            buffer[0] = g_page_counter_val;
 
+            SPI_xmit_t erase_page;
+            erase_page.cmd = SPI_FLASH_CMD_ERASE;
+            erase_page.len = sizeof(erase_page.data);
+            erase_page.data = buffer;
+
+            SPI_xmit_t write_page;
+            write_page.cmd = SPI_FLASH_CMD_WRITE;
+            write_page.len = sizeof(g_buffer[g_buffer_counter_val]);
+            write_page.data = (uint8_t*)&g_buffer[g_buffer_counter_val];
+
+            g_buffer_counter_val = 0;
+
+            if (g_page_counter_val >= (SPI_FLASH_SZ / SPI_FLASH_PAGE_SIZE - 1)) {
+                g_page_counter_val = 0;
+            }
+            else {
+                g_page_counter_val += 1;
+            }
+        }
+        else {
+            g_buffer_counter_val += 1;
+        } 
+
+        SLEEP_NOW_MS(500);
 
 
     }

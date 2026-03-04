@@ -93,9 +93,9 @@ int main(int argc, char **argv) {
     while(true) {
         // Send the CAN RTR frames to the BatteryTemperatureVehicleModule every 500ms
         // Once a full SPI Flash page size worth of data is received, save it to the SPI Flash
-        can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_average_val));
-        can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_current_val));
-        can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_RTR_FRAME, 0, sizeof(g_timestamp_current_val));
+        can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_RTR_FRAME, nullptr, 0);
+        can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_RTR_FRAME, nullptr, 0);
+        can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_RTR_FRAME, nullptr, 0);
 
         printf("CAN RTR frames sent\n");
 

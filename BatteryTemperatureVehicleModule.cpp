@@ -37,7 +37,7 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
     if(id == CAN_AVG_TEMPERATURE_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
-        printf("Average temperature data: %d\n", g_average_val);
+        printf("Average temperature data CAN: %d\n", g_average_val);
         // Setup CAN DATA frame to send the avg temperature data
         uint8_t payload[1];
         payload[0] = g_average_val;
@@ -45,7 +45,7 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
     } else if(id == CAN_CURRENT_TEMP_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
-        printf("Current temperature data: %d\n", g_current_val);
+        printf("Current temperature data CAN: %d\n", g_current_val);
         // Setup CAN DATA frame to send the current temperature data
         uint8_t payload[1];
         payload[0] = g_current_val;
@@ -53,7 +53,7 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 
     } else if(id == CAN_TIME_11_SENSOR_ID && type == CAN_RTR_FRAME) {
 
-        printf("Current time: %d\n", data[0]);
+        printf("Current time CAN: %d\n", data[0]);
         // Setup CAN DATA frame to send the time
         uint64_t t_now = TIME_NOW_S();
         std::memcpy(g_payload, &t_now, sizeof(t_now));
@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
     lin_write_config(LIN_CONTROL_REGISTER, LIN_BAUD_RATE_9600 | LIN_START_BITS_1 | LIN_STOP_BITS_1 | LIN_DATA_BITS_8 | LIN_NO_FLOW_CONTROL | LIN_MODE_LEADER | LIN_PARITY_NONE);
     can_write_config(CAN_HARDWARE_REGISTER, CAN_BAUD_RATE_100K | CAN_FORMAT_11BIT);
 
+    //can_add_filter(0,0x00,0x00);
     can_add_filter(0,0x7FF,0x14F);
     can_add_filter(1,0x7FF,0x15F);
     can_add_filter(2,0x7FF,0x18F);

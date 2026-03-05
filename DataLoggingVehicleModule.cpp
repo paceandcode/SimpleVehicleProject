@@ -39,7 +39,7 @@ static uint64_t g_timestamp_current_val = 0;
 
 SPI_FLASH_data_pt_t g_buffer[SPI_FLASH_DATA_PTS_PER_PAGE];
 static uint8_t g_buffer_counter_val = 0;
-static uint8_t g_page_counter_val = 0;
+static uint32_t g_page_counter_val = 0;
 
 void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t len) {
     // we can not save the page in the isr, too slow
@@ -58,15 +58,15 @@ void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t le
 
     } else if(id == CAN_TIME_11_SENSOR_ID && type == CAN_DATA_FRAME) {
 
-        printf("Time stamp data: %d\n", data[0]);
-        g_buffer[g_buffer_counter_val].time = (data[0] << 24) | (data[1] << 16) | (data[2] << 8)| (data[3] << 0);
+        printf("Time stamp data: %d, %d, %d, %d\n", data[3],data[2],data[1],data[0]);
+        g_buffer[g_buffer_counter_val].time = (data[3] << 24) | (data[2] << 16) | (data[1] << 8)| (data[0] << 0);
 
     }
     else {
         printf("Unknown CAN packet received\n");
     }
 
-    printf("CAN packet received\n");
+    // printf("CAN packet received\n");
     // Clear the can interrupt before exit isr:
     can_clear_rx_packet_interrupt();
 }
@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
     spi_write_config(SPI_HARDWARE_REGISTER, SPI_CLK_1MHZ | SPI_CS_1);
     printf("CAN & SPI config set\n");
 
+    //can_add_filter(0,0x00,0x00);
     can_add_filter(0,0x7FF,0x14F);
     can_add_filter(1,0x7FF,0x15F);
     can_add_filter(2,0x7FF,0x18F);
@@ -88,8 +89,6 @@ int main(int argc, char **argv) {
     // Add the CAN RX ISR
     can_add_rx_packet_interrupt(can_packet_isr);
 
-    printf("CAN RX interrupt set\n");
-
     while(true) {
         // Send the CAN RTR frames to the BatteryTemperatureVehicleModule every 500ms
         // Once a full SPI Flash page size worth of data is received, save it to the SPI Flash
@@ -97,35 +96,65 @@ int main(int argc, char **argv) {
         can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_RTR_FRAME, nullptr, 0);
         can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_RTR_FRAME, nullptr, 0);
 
-        printf("CAN RTR frames sent\n");
+        //printf("CAN RTR frames sent\n");
 
+        // Save data to SPI flash when size of buffer is equal to page size 
         if (g_buffer_counter_val >= (SPI_FLASH_DATA_PTS_PER_PAGE - 1)) {
-            // Flash löschen und schreiben
-            uint8_t buffer[1];
-            buffer[0] = g_page_counter_val;
 
             SPI_xmit_t erase_page;
             erase_page.cmd = SPI_FLASH_CMD_ERASE;
-            erase_page.len = sizeof(erase_page.data);
-            erase_page.data = buffer;
+            erase_page.data = (uint8_t*)&g_page_counter_val;
+
+            printf("Erase Flash Page Number: %d\n", spi_write_data(&erase_page,SPI_CS_1));
+
+            uint8_t write_data[(sizeof(g_page_counter_val) + sizeof(g_buffer))];
+            memcpy(write_data,&g_page_counter_val,sizeof(g_page_counter_val));
+            memcpy(write_data + sizeof(g_page_counter_val),&g_buffer,sizeof(g_buffer));
 
             SPI_xmit_t write_page;
             write_page.cmd = SPI_FLASH_CMD_WRITE;
-            write_page.len = sizeof(g_buffer[g_buffer_counter_val]);
-            write_page.data = (uint8_t*)&g_buffer[g_buffer_counter_val];
+            write_page.len = sizeof(g_buffer);
+            write_page.data = (uint8_t*)&write_data;
 
+            printf("Write Flash Page Number: %d\n", spi_write_data(&write_page,SPI_CS_1));
+
+            // Reset buffer counter to 0 after flash page is written
             g_buffer_counter_val = 0;
+            
+            // Optional block to read flash page memory to verify the data
+            /* 
+            uint8_t buffer_read[(sizeof(g_page_counter_val) + sizeof(g_buffer))];
+
+            memcpy(buffer_read,&g_page_counter_val,sizeof(g_page_counter_val));
+
+            SPI_xmit_t read_page;
+            read_page.cmd = SPI_FLASH_CMD_READ;
+            read_page.len = sizeof(g_buffer);
+            read_page.data = (uint8_t*)&buffer_read;
+
+            
+            printf("Read Flash Page Number: %d\n", spi_read_data(&read_page,SPI_CS_1));
+            printf("Page content:\n");
+            for(int i = 0; i <= 63; i++) {
+                printf("%d,", buffer_read[i + sizeof(g_page_counter_val)]);
+            }
+            printf("\n");
+            */
 
             if (g_page_counter_val >= (SPI_FLASH_SZ / SPI_FLASH_PAGE_SIZE - 1)) {
+                // Reset flash page counter to 0 after flash is full
                 g_page_counter_val = 0;
             }
             else {
+                // Increment flash page counter after writing data to flash page
                 g_page_counter_val += 1;
             }
         }
         else {
+            // Increment buffer counter after CAN RTR frames have been send
             g_buffer_counter_val += 1;
         } 
+
 
         SLEEP_NOW_MS(500);
 
